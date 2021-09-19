@@ -2,7 +2,9 @@
 
 [![https://i.imgur.com/UwNMnx5.png](https://i.imgur.com/UwNMnx5.png)](https://peter.tilde.team/games/w4-2048/)
 
-## [Play in your Browser](https://peter.tilde.team/games/w4-2048/)
+## 🎮  [Play](https://peter.tilde.team/games/w4-2048/) (Arrow keys, X, Z)
+ - 🎵  [Play with music](https://peter.tilde.team/games/w4-2048/with-music.html)
+ - 🔉🎵 [Play with sound and music](https://peter.tilde.team/games/w4-2048/with-sound-and-music.html)
 
 > Game logic initially based on <https://github.com/chhabraamit/2048>
 
