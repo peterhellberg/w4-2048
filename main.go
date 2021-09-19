@@ -7,19 +7,27 @@ import (
 	"strconv"
 )
 
+const (
+	tracingEnabled = false
+	soundEnabled   = true
+	musicEnabled   = true
+)
+
 var ui *UI
 
 //go:export start
 func start() {
 	seed := uint32(478194671)
 
-	ui = newUI(game.New(seed), w4.GAMEPAD1, palettes.Platinum)
+	ui = NewUI(game.New(seed), w4.GAMEPAD1, palettes.IceCreamGB)
 }
 
 //go:export update
 func update() {
-	ui.check()
+	ui.frame++
 	ui.show()
+	ui.sound()
+	ui.music()
 	ui.input()
 }
 
@@ -29,47 +37,26 @@ type UI struct {
 	frame uint
 	old   uint8
 	pad   *uint8
+	pal   [4]uint32
 }
 
-func newUI(board game.Board, pad *uint8, palette [4]uint32) *UI {
-	return &UI{Board: board, pad: pad}
-
-	ui.changePalette(palette)
-
-	return ui
-}
-
-func (ui *UI) check() {
-	ui.frame++
-}
-
-func (ui *UI) input() {
-	switch {
-	case ui.btn1():
-		log("BTN1")
-		ui.Input(game.KeyBTN1)
-		ui.randomPalette()
-	case ui.btn2():
-		log("BTN2")
-		ui.Input(game.KeyBTN2)
-	case ui.up():
-		log("🡱")
-		ui.Input(game.KeyUp)
-	case ui.down():
-		log("🡳")
-		ui.Input(game.KeyDown)
-	case ui.right():
-		log("🡲")
-		ui.Input(game.KeyRight)
-	case ui.left():
-		log("🡰")
-		ui.Input(game.KeyLeft)
+func NewUI(board game.Board, pad *uint8, pal [4]uint32) *UI {
+	return &UI{
+		Board: board,
+		pad:   pad,
+		pal:   pal,
 	}
-
-	ui.old = *ui.pad
 }
+
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
+// │ Rendering                                                                 │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
 
 func (ui *UI) show() {
+	setPalette(ui.pal)
+
 	dotbg(0, 0, 160, 27, 3, 0x3, 0x4)
 
 	// Pts border
@@ -153,47 +140,6 @@ func (ui *UI) show() {
 	}
 }
 
-func (ui *UI) up() bool {
-	return *ui.pad&w4.BUTTON_UP != 0 && ui.old&w4.BUTTON_UP == 0
-}
-
-func (ui *UI) down() bool {
-	return *ui.pad&w4.BUTTON_DOWN != 0 && ui.old&w4.BUTTON_DOWN == 0
-}
-
-func (ui *UI) right() bool {
-	return *ui.pad&w4.BUTTON_RIGHT != 0 && ui.old&w4.BUTTON_RIGHT == 0
-}
-
-func (ui *UI) left() bool {
-	return *ui.pad&w4.BUTTON_LEFT != 0 && ui.old&w4.BUTTON_LEFT == 0
-}
-
-func (ui *UI) btn1() bool {
-	return *ui.pad&w4.BUTTON_1 != 0 && ui.old&w4.BUTTON_1 == 0
-}
-
-func (ui *UI) btn2() bool {
-	return *ui.pad&w4.BUTTON_2 != 0 && ui.old&w4.BUTTON_2 == 0
-}
-
-func (ui *UI) log(s string) {
-	log(leftpad(utoa(ui.frame), " ", 5) + " - " + s)
-}
-
-func (ui *UI) changePalette(p [4]uint32) {
-	w4.PALETTE[0] = p[0]
-	w4.PALETTE[1] = p[1]
-	w4.PALETTE[2] = p[2]
-	w4.PALETTE[3] = p[3]
-}
-
-func (ui *UI) randomPalette() {
-	i := int(ui.frame) % len(palettes.All)
-
-	ui.changePalette(palettes.All[i])
-}
-
 func showTile(col, row, val int) {
 	x, y := 2+(col*41), 32+row*32
 	w, h := uint(35), uint(27)
@@ -273,6 +219,123 @@ func tileShadow(val int) {
 	}
 }
 
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
+// │ Palette                                                                   │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
+
+func setPalette(p [4]uint32) {
+	w4.PALETTE[0] = p[0]
+	w4.PALETTE[1] = p[1]
+	w4.PALETTE[2] = p[2]
+	w4.PALETTE[3] = p[3]
+}
+
+func (ui *UI) randomPalette() {
+	ui.pal = palettes.All[int(ui.frame)%len(palettes.All)]
+}
+
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
+// │ Music and Sound                                                           │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
+
+func (ui *UI) music() {
+	if !musicEnabled {
+		return
+	}
+
+	switch {
+	case ui.beat(24):
+		play(Sound{40, 0, 0, 8, 0, 0, 0, 2, 0})
+	case ui.beat(32):
+		play(Sound{80, 0, 0, 8, 0, 0, 0, 2, 0})
+	case ui.beat(96):
+		play(Sound{160, 0, 0, 8, 0, 0, 0, 2, 0})
+	}
+}
+
+func (ui *UI) beat(n uint) bool {
+	return ui.frame%n == 0
+}
+
+func (ui *UI) sound() {
+	if !soundEnabled {
+		return
+	}
+
+	switch {
+	case ui.btn1():
+	case ui.btn2():
+	case ui.up():
+		play(sfxUp)
+	case ui.down():
+		play(sfxDown)
+	case ui.right():
+		play(sfxRight)
+	case ui.left():
+		play(sfxLeft)
+	}
+}
+
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
+// │ Input                                                                     │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
+
+func (ui *UI) input() {
+	switch {
+	case ui.btn1():
+		log("BTN1")
+		ui.Input(game.KeyBTN1)
+		ui.randomPalette()
+	case ui.btn2():
+		log("BTN2")
+		ui.Input(game.KeyBTN2)
+	case ui.up():
+		log("🡱")
+		ui.Input(game.KeyUp)
+	case ui.down():
+		log("🡳")
+		ui.Input(game.KeyDown)
+	case ui.right():
+		log("🡲")
+		ui.Input(game.KeyRight)
+	case ui.left():
+		log("🡰")
+		ui.Input(game.KeyLeft)
+	}
+
+	ui.old = *ui.pad
+}
+
+func (ui *UI) up() bool {
+	return *ui.pad&w4.BUTTON_UP != 0 && ui.old&w4.BUTTON_UP == 0
+}
+
+func (ui *UI) down() bool {
+	return *ui.pad&w4.BUTTON_DOWN != 0 && ui.old&w4.BUTTON_DOWN == 0
+}
+
+func (ui *UI) right() bool {
+	return *ui.pad&w4.BUTTON_RIGHT != 0 && ui.old&w4.BUTTON_RIGHT == 0
+}
+
+func (ui *UI) left() bool {
+	return *ui.pad&w4.BUTTON_LEFT != 0 && ui.old&w4.BUTTON_LEFT == 0
+}
+
+func (ui *UI) btn1() bool {
+	return *ui.pad&w4.BUTTON_1 != 0 && ui.old&w4.BUTTON_1 == 0
+}
+
+func (ui *UI) btn2() bool {
+	return *ui.pad&w4.BUTTON_2 != 0 && ui.old&w4.BUTTON_2 == 0
+}
+
 func dotbg(x1, y1, w, h, s int, dc, bg uint16) {
 	for x := x1; x < w; x++ {
 		for y := y1; y < h; y++ {
@@ -283,6 +346,18 @@ func dotbg(x1, y1, w, h, s int, dc, bg uint16) {
 			}
 		}
 	}
+}
+
+func (ui *UI) log(s string) {
+	log(leftpad(utoa(ui.frame), " ", 5) + " - " + s)
+}
+
+func log(s string) {
+	if !tracingEnabled {
+		return
+	}
+
+	w4.Trace(s)
 }
 
 func set(x, y int, c uint16) {
@@ -306,9 +381,51 @@ func text(s string, x, y int) {
 	w4.Text(s, x, y)
 }
 
-func log(s string) {
-	w4.Trace(s)
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
+// │ Sound Effects                                                             │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
+
+type Sound struct {
+	freq1   uint
+	freq2   uint
+	attack  uint
+	decay   uint
+	sustain uint
+	release uint
+	volume  uint
+	channel uint
+	mode    uint
 }
+
+func play(s Sound) {
+	var (
+		freq     = s.freq1 | s.freq2<<16
+		duration = s.attack<<24 | s.decay<<16 | s.sustain | s.release<<8
+		flags    = s.channel | s.mode<<2
+	)
+
+	w4.Tone(freq, duration, s.volume, flags)
+}
+
+var (
+	//sfxUp    = Sound{40, 0, 0, 8, 0, 0, 0, 2, 0}
+	//sfxDown  = Sound{80, 0, 0, 8, 0, 0, 0, 2, 0}
+	//sfxRight = Sound{120, 0, 0, 8, 0, 0, 0, 2, 0}
+	//sfxLeft  = Sound{160, 0, 0, 8, 0, 0, 0, 2, 0}
+
+	sfxUp    = Sound{140, 20, 4, 10, 0, 0, 0, 0, 2}
+	sfxDown  = Sound{140, 20, 4, 10, 0, 0, 0, 0, 2}
+	sfxRight = Sound{140, 20, 4, 10, 0, 0, 0, 0, 2}
+	sfxLeft  = Sound{140, 20, 4, 10, 0, 0, 0, 0, 2}
+)
+
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │                                                                           │
+// │ String functions                                                          │
+// │                                                                           │
+// └───────────────────────────────────────────────────────────────────────────┘
 
 func leftpad(s, c string, w int) string {
 	n := w - len(s)
